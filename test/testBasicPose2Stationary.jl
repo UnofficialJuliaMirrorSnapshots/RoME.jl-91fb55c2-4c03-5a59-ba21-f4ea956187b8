@@ -27,17 +27,19 @@ badval = 0.01.*randn(3,100)
 badval[1,:] .-= 5.0
 badval[2,:] .-= 2.0
 badval[3,:] .+= 0.5
-setValKDE!(fg, :x2, kde!(badval))
+setValKDE!(fg, :x2, manikde!(badval, Pose2().manifolds))
 
 N = 100
-batchSolve!(fg, N=N)
+# batchSolve!(fg, N=N)
+tree, smt, hist = solveTree!(fg)
 
 for xx in [:x0; :x1; :x2]
   pts = getVal(fg, xx)
-  @test 0.95*N < sum( -0.5 .< pts[1,:] .< 0.5 )
-  @test 0.95*N < sum( -0.5 .< pts[2,:] .< 0.5 )
+  @test 0.95*N < sum( -1.0 .< pts[1,:] .< 1.0 )
+  @test 0.95*N < sum( -1.0 .< pts[2,:] .< 1.0 )
   @test 0.95*N < sum( -0.5 .< pts[3,:] .< 0.5 )
 end
+
 
 end
 
@@ -84,8 +86,8 @@ batchSolve!(fg, N=N)
 for xx in [:x0; :x1; :x2]
   pts = getVal(fg, xx)
   @test 0.95*N < sum( -0.5 .< pts[1,:] .< 0.5 )
-  @test 0.95*N < sum( -0.5 .< pts[2,:] .< 0.5 )
-  @test 0.95*N < sum( -0.5 .< pts[3,:] .< 0.5 )
+  @test 0.95*N < sum( -1.0 .< pts[2,:] .< 1.0 )
+  @test 0.95*N < sum( -1.0 .< pts[3,:] .< 1.0 )
 end
 
 end
@@ -100,5 +102,53 @@ end
 
 
 
+@testset "test basic banana (split)..." begin
+
+
+fg = initfg()
+
+addVariable!(fg, :x0, Pose2())
+addVariable!(fg, :x1, Pose2())
+
+addFactor!(fg,
+           [:x0],
+           PriorPose2(MvNormal(zeros(3), Matrix(Diagonal([0.01;0.01;1.0].^2)))),
+           autoinit=false )
+#
+
+addFactor!(fg,
+           [:x0;:x1],
+           Pose2Pose2(MvNormal([1.0;0;0], Matrix(Diagonal([0.01;0.01;0.01].^2)))),
+           autoinit=false )
+#
+
+solveTree!(fg)
+
+
+pts = getPoints(getKDE(fg, :x0))
+
+N = size(pts,2)
+
+@test 0.7*N < sum(abs.(pts[1,:]) .< 0.1)
+@test 0.7*N < sum(abs.(pts[2,:]) .< 0.1)
+@test 0.7*N < sum(abs.(pts[3,:]) .< 2.0)
+
+
+
+pts = getPoints(getKDE(fg, :x1))
+
+@test 0.7*N < sum(0.0 .< pts[1,:])
+@test 0.7*N < sum( 0.5 .< sqrt.(sum(pts[1:2,:].^2, dims=1)) .< 1.5)
+@test 0.7*N < sum(abs.(pts[3,:]) .< 2.0)
+
+
 
 #
+# using RoMEPlotting
+# using Gadfly
+# Gadfly.set_default_plot_size(35cm,25cm)
+#
+# plotKDE(fg, ls(fg))
+
+
+end
